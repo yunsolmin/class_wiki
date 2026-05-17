@@ -162,9 +162,6 @@ const state = {
 };
 
 const elements = {
-  sessionNickname: document.querySelector("#session-nickname"),
-  openLoginButton: document.querySelector("#open-login-button"),
-  logoutButton: document.querySelector("#logout-button"),
   sendMailButton: document.querySelector("#send-mail-button"),
   loginModal: document.querySelector("#login-modal"),
   currentRoleLabel: document.querySelector("#current-role-label"),
@@ -310,28 +307,23 @@ function renderRole() {
   const isTeacher = role === "teacher";
   const isStudent = role === "student";
 
-  elements.sessionNickname.textContent = getSessionNickname();
-  elements.openLoginButton.disabled = isLoggedIn();
-  elements.logoutButton.disabled = !isLoggedIn();
-  elements.currentRoleLabel.textContent = isTeacher ? "담임선생님 모드" : isStudent ? "학생 모드" : "열람 모드";
+  elements.currentRoleLabel.textContent = isTeacher ? "담임선생님 모드" : isStudent ? "학생 모드" : "방문자 모드";
   elements.currentRoleDescription.textContent = isTeacher
     ? `${getSessionNickname()} 계정으로 승인, 제재, 배경과 타이틀 색상을 관리합니다.`
     : isStudent
       ? `${getSessionNickname()} 계정으로 로그인했습니다. 일반 파일 수정과 요청을 사용할 수 있습니다.`
-      : "로그인 전에는 폴더와 파일을 열람할 수 있습니다.";
+      : "로그인 전에는 열람 및 관람이 불가합니다.";
   elements.teacherPanel.classList.toggle("hidden", !isTeacher);
   elements.newFileRequestButton.classList.toggle("hidden", isTeacher);
 }
 
 function renderAuth() {
-  elements.loginStatus.textContent = state.session ? `${state.session.nickname} 로그인 중` : "열람 모드";
+  elements.loginStatus.textContent = state.session ? `${state.session.nickname} 로그인 중` : "방문자 모드";
   elements.loginStatus.className = `status-badge ${state.session ? "status-approved" : "status-open"}`;
 
-  elements.authPanelBody.innerHTML = `
-    <button class="primary-button" data-auth-action="open-login" type="button" ${isLoggedIn() ? "disabled" : ""}>
-      로그인 창 열기
-    </button>
-  `;
+  elements.authPanelBody.innerHTML = isLoggedIn()
+    ? `<button class="ghost-button" data-auth-action="logout" type="button">로그아웃</button>`
+    : `<button class="primary-button" data-auth-action="open-login" type="button">로그인 창 열기</button>`;
 }
 
 function renderStudentWarning() {
@@ -629,7 +621,7 @@ function handleLogin(event) {
 
 function handleLogout() {
   state.session = null;
-  showToast("로그아웃했습니다. 열람 모드로 전환됩니다.");
+  showToast("로그아웃했습니다. 방문자 모드로 전환됩니다.");
   render();
 }
 
@@ -861,8 +853,6 @@ function handleModalClick(event) {
   if (event.target === elements.loginModal) closeModal("login");
 }
 
-elements.openLoginButton.addEventListener("click", () => openModal("login"));
-elements.logoutButton.addEventListener("click", handleLogout);
 elements.sendMailButton.addEventListener("click", handleSendMail);
 elements.authPanelBody.addEventListener("click", handleAuthClick);
 document.querySelector("#login-form").addEventListener("submit", handleLogin);
