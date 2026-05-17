@@ -404,6 +404,60 @@ button:disabled {
   gap: 12px;
 }
 
+.mail-result {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  margin-top: 16px;
+  padding: 16px 18px;
+}
+
+.mail-result.hidden {
+  display: none;
+}
+
+.mail-result h4 {
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.mail-credential-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.mail-credential-row:last-child {
+  margin-bottom: 0;
+}
+
+.mail-credential-label {
+  color: var(--muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.mail-credential-value {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.mail-open-link {
+  display: block;
+  margin-top: 14px;
+  text-align: center;
+}
+
 .login-subtitle-row {
   align-items: center;
   display: flex;
@@ -413,6 +467,28 @@ button:disabled {
 
 .login-subtitle-row .helper-text {
   margin: 0;
+}
+
+.login-error {
+  align-items: center;
+  background: #fff1f1;
+  border: 1px solid #f5c2c2;
+  border-radius: 10px;
+  color: var(--danger);
+  display: flex;
+  font-size: 0.92rem;
+  font-weight: 600;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.login-error::before {
+  content: "⚠";
+  font-size: 1rem;
+}
+
+.login-error.hidden {
+  display: none;
 }
 
 .input-example {

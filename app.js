@@ -1,4 +1,86 @@
-﻿const typeLabels = {
+﻿// Google OAuth 클라이언트 ID (Google Cloud Console에서 발급)
+// https://console.cloud.google.com/ → API 및 서비스 → 사용자 인증 정보 → OAuth 2.0 클라이언트 ID
+const GMAIL_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
+
+let gmailTokenClient = null;
+let gmailAccessToken = null;
+let pendingMailPayload = null;
+
+function initGmailToken() {
+  if (!window.google) return;
+  gmailTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GMAIL_CLIENT_ID,
+    scope: "https://www.googleapis.com/auth/gmail.send",
+    callback: (response) => {
+      if (response.error) {
+        showToast("Google 인증에 실패했습니다.");
+        return;
+      }
+      gmailAccessToken = response.access_token;
+      if (pendingMailPayload) {
+        const { to, subject, body } = pendingMailPayload;
+        pendingMailPayload = null;
+        sendViaGmailApi(to, subject, body);
+      }
+    },
+  });
+}
+
+function buildMimeMessage(to, subject, body) {
+  const lines = [
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    btoa(unescape(encodeURIComponent(body))),
+  ];
+  return btoa(lines.join("\r\n"))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+async function sendViaGmailApi(to, subject, body) {
+  const raw = buildMimeMessage(to, subject, body);
+  try {
+    const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${gmailAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ raw }),
+    });
+    if (res.ok) {
+      showToast("메일이 성공적으로 발송되었습니다!");
+      closeModal("mail");
+    } else {
+      const err = await res.json();
+      showToast(`발송 실패: ${err.error?.message ?? "알 수 없는 오류"}`);
+    }
+  } catch {
+    showToast("네트워크 오류로 메일을 보내지 못했습니다.");
+  }
+}
+
+function requestGmailSend(to, subject, body) {
+  if (GMAIL_CLIENT_ID === "YOUR_CLIENT_ID.apps.googleusercontent.com") {
+    showToast("GMAIL_CLIENT_ID를 설정해야 자동 발송이 가능합니다.");
+    return false;
+  }
+  if (!gmailTokenClient) initGmailToken();
+  pendingMailPayload = { to, subject, body };
+  if (gmailAccessToken) {
+    sendViaGmailApi(to, subject, body);
+  } else {
+    gmailTokenClient.requestAccessToken();
+  }
+  return true;
+}
+
+const typeLabels = {
   normal: "일반 파일",
   important: "중요 파일",
   critical: "최중요 파일",
@@ -120,6 +202,7 @@ const state = {
     { id: 3, number: 3, name: "박현민", nickname: "10번 박현민", username: "26-10610@ilgo.gen.hs.kr", legacyUsername: "star-4829", password: "class-4472", banned: false },
     { id: 4, number: 4, name: "정민우", nickname: "21번 정민우", username: "26-10621@ilgo.gen.hs.kr", legacyUsername: "moon-7364", password: "read-1358", banned: true },
     { id: 5, number: 5, name: "정원우", nickname: "22번 정원우", username: "26-10622@ilgo.gen.hs.kr", legacyUsername: "fire-1582", password: "page-7193", banned: false },
+    { id: 6, number: 6, name: "12번 학생", nickname: "12번 학생", username: "26-10612@ilgo.gen.hs.kr", legacyUsername: "leaf-3057", password: "jump-5824", banned: false },
   ],
   requests: [
     {
@@ -164,6 +247,10 @@ const state = {
 const elements = {
   sendMailButton: document.querySelector("#send-mail-button"),
   loginModal: document.querySelector("#login-modal"),
+  mailModal: document.querySelector("#mail-modal"),
+  mailForm: document.querySelector("#mail-form"),
+  mailEmailInput: document.querySelector("#mail-email-input"),
+  mailResult: document.querySelector("#mail-result"),
   currentRoleLabel: document.querySelector("#current-role-label"),
   currentRoleDescription: document.querySelector("#current-role-description"),
   loginStatus: document.querySelector("#login-status"),
@@ -603,9 +690,10 @@ function handleLogin(event) {
   const isTeacher = teacherAccount.legacyUsername === username && teacherAccount.password === password;
 
   if (!student && !isTeacher) {
-    showToast("아이디 또는 비밀번호가 올바르지 않습니다.");
+    document.querySelector("#login-error").classList.remove("hidden");
     return;
   }
+  document.querySelector("#login-error").classList.add("hidden");
 
   if (isTeacher) {
     state.session = { id: teacherAccount.id, role: "teacher", name: teacherAccount.name, nickname: teacherAccount.nickname };
@@ -819,7 +907,62 @@ function handleBackgroundChange(event) {
 }
 
 function handleSendMail() {
-  showToast("학교 지급 이메일로 계정 안내 메일을 보냈습니다.");
+  openModal("mail");
+}
+
+function handleMailFormSubmit(event) {
+  event.preventDefault();
+  const email = elements.mailEmailInput.value.trim();
+  if (!email) return;
+
+  const student = state.students.find((s) => s.username === email);
+  const isTeacher = teacherAccount.username === email;
+  const account = isTeacher ? teacherAccount : (student ?? null);
+
+  let credentialsHtml = "";
+  let bodyText = "";
+
+  if (account) {
+    bodyText = `안녕하세요, ${account.nickname}님!\n\n우리학급위키 임시 로그인 계정을 안내드립니다.\n\n아이디: ${account.legacyUsername}\n비밀번호: ${account.password}\n\n위 정보로 로그인해 주세요.`;
+    credentialsHtml = `
+      <h4>발급된 계정 정보</h4>
+      <div class="mail-credential-row">
+        <span class="mail-credential-label">닉네임</span>
+        <span class="mail-credential-value">${escapeHtml(account.nickname)}</span>
+      </div>
+      <div class="mail-credential-row">
+        <span class="mail-credential-label">아이디</span>
+        <span class="mail-credential-value">${escapeHtml(account.legacyUsername)}</span>
+      </div>
+      <div class="mail-credential-row">
+        <span class="mail-credential-label">비밀번호</span>
+        <span class="mail-credential-value">${escapeHtml(account.password)}</span>
+      </div>
+    `;
+  } else {
+    bodyText = `안녕하세요!\n\n우리학급위키 임시 로그인 계정을 안내드립니다.\n\n아이디: \n비밀번호: \n\n위 정보로 로그인해 주세요.`;
+    credentialsHtml = `<p class="helper-text">등록된 계정이 없습니다. Gmail에서 아이디와 비밀번호를 직접 입력해 주세요.</p>`;
+  }
+
+  const subjectRaw = "[우리학급위키] 임시 로그인 계정 안내";
+
+  elements.mailResult.classList.remove("hidden");
+  elements.mailResult.innerHTML = `
+    ${credentialsHtml}
+    <button class="primary-button mail-open-link" id="gmail-send-btn" type="button">
+      Google 계정으로 발송
+    </button>
+  `;
+
+  document.getElementById("gmail-send-btn").addEventListener("click", () => {
+    const sent = requestGmailSend(email, subjectRaw, bodyText);
+    if (!sent) {
+      const fallbackBody = encodeURIComponent(bodyText);
+      const fallbackSubject = encodeURIComponent(subjectRaw);
+      const gmailHref = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(email)}&su=${fallbackSubject}&body=${fallbackBody}`;
+      window.open(gmailHref, "_blank", "noopener");
+    }
+  });
 }
 
 function handleAuthClick(event) {
@@ -832,15 +975,21 @@ function handleAuthClick(event) {
 }
 
 function openModal(kind) {
-  if (kind === "login") {
-    elements.loginModal.classList.remove("hidden");
+  if (kind === "login") elements.loginModal.classList.remove("hidden");
+  if (kind === "mail") {
+    elements.mailModal.classList.remove("hidden");
+    elements.mailEmailInput.value = "";
+    elements.mailResult.classList.add("hidden");
+    elements.mailResult.innerHTML = "";
   }
 }
 
 function closeModal(kind) {
   if (kind === "login") {
     elements.loginModal.classList.add("hidden");
+    document.querySelector("#login-error").classList.add("hidden");
   }
+  if (kind === "mail") elements.mailModal.classList.add("hidden");
 }
 
 function handleModalClick(event) {
@@ -849,14 +998,16 @@ function handleModalClick(event) {
     closeModal(closeButton.dataset.closeModal);
     return;
   }
-
   if (event.target === elements.loginModal) closeModal("login");
+  if (event.target === elements.mailModal) closeModal("mail");
 }
 
 elements.sendMailButton.addEventListener("click", handleSendMail);
 elements.authPanelBody.addEventListener("click", handleAuthClick);
 document.querySelector("#login-form").addEventListener("submit", handleLogin);
 elements.loginModal.addEventListener("click", handleModalClick);
+elements.mailModal.addEventListener("click", handleModalClick);
+elements.mailForm.addEventListener("submit", handleMailFormSubmit);
 elements.folderList.addEventListener("click", handleFolderSelect);
 elements.fileList.addEventListener("click", handleFileSelect);
 elements.newFileRequestButton.addEventListener("click", handleNewFileRequest);

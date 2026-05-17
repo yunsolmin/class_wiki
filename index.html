@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>우리학급위키</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://accounts.google.com/gsi/client" async></script>
   </head>
   <body>
     <section class="auth-panel" aria-label="로그인">
@@ -124,8 +125,32 @@
             비밀번호
             <input id="login-password" autocomplete="current-password" placeholder="지급받은 비밀번호 입력" type="password" />
           </label>
+          <div id="login-error" class="login-error hidden" role="alert">
+            아이디 또는 비밀번호가 올바르지 않습니다.
+          </div>
           <button class="primary-button" type="submit">로그인</button>
         </form>
+      </div>
+    </div>
+
+    <div id="mail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="mail-modal-title">
+      <div class="modal-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">계정 안내 메일</p>
+            <h2 id="mail-modal-title">임시 아이디·비밀번호 보내기</h2>
+          </div>
+          <button class="ghost-button" data-close-modal="mail" type="button">닫기</button>
+        </div>
+        <form id="mail-form" class="login-form">
+          <label>
+            학교 지급 이메일 주소
+            <span class="input-example">(ex : 26-10601@ilgo.gen.hs.kr)</span>
+            <input id="mail-email-input" type="email" autocomplete="email" placeholder="학교 이메일을 입력하세요" />
+          </label>
+          <button class="primary-button" type="submit">보내기</button>
+        </form>
+        <div id="mail-result" class="mail-result hidden"></div>
       </div>
     </div>
 
